@@ -1,0 +1,239 @@
+
+title: "Single-cell RNA-seq dataset analysis - July exam"
+author: "Carlotta Patella"
+student ID number: "1085170"
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+This analysis is based on a dataset of approximately 10,000 cells obtained with 10X Genomics 3’ technology. The goal is to analyze the cells based on gene expression, filter and annotate the data, explore structure through PCA and UMAP, identify cell clusters, assign cell types through automatic annotation, and finally infer the tissue of origin.
+
+---
+
+# Task 0 - Setup
+
+```{r, message=FALSE, warning=FALSE}
+# Install Seurat and SeuratObject (if not already present) and load libraries
+if (!require("Seurat")) BiocManager::install("SingleR")
+if (!require("SeuratObject")) BiocManager::install("celldex")
+
+library(Seurat)
+library(SeuratObject)
+```
+
+---
+
+# Task 1 - GENE ANNOTATION
+
+```{r, message=FALSE, warning=FALSE}
+
+# Set the working directory where the GTF file is located
+library(here)
+
+# Load the GTF file
+gtf <- read.table(here::here("Homo_sapiens.GRCh38.111.gtf"), sep = "\t", header = FALSE, comment.char = "#")
+head(gtf)  # check the first lines of the file
+
+
+# Load 10X expression data from the "filtered_feature_bc_matrix" folder (contains barcodes, features, and count matrix)
+data <- Read10X(data.dir = "filtered_feature_bc_matrix")
+
+# Create Seurat object 
+seurat_obj <- CreateSeuratObject(counts = data)
+seurat_obj #check the creation 
+
+# Create a function to extract data which will be used throughout the code
+extract_attribute <- function(text, key) {
+  parts <- strsplit(as.character(text), ";")[[1]]
+  for (part in parts) {
+    part <- trimws(part)
+    if (startsWith(part, key)) {
+      value <- strsplit(part, " ")[[1]][2]
+      value <- gsub('"', '', value)
+      return(value)
+    }
+  }
+  return(NA)
+}
+
+# From column V3 of the GTF file that contains the each gene's annotations, select only rows that are classified as "gene"
+only_genes <- gtf[gtf$V3 == "gene", ]
+
+#Assess the filtration's happening by comparing initial number of data and filtered genes
+nrow(gtf) #initial data
+nrow(only_genes) #filtered genes
+head(only_genes) # preview of filtered genes
+
+# Extract key attributes: gene_name and gene_biotype
+only_genes$gene_name <- sapply(only_genes$V9, extract_attribute, key = "gene_name")
+only_genes$gene_biotype <- sapply(only_genes$V9, extract_attribute, key = "gene_biotype")
+
+# Filter only protein-coding genes based on the gene biotype 
+protein_coding_genes <- only_genes[only_genes$gene_biotype == "protein_coding", ]
+# Remove not-named genes to avoid mismatches that cause errors
+protein_coding_names <- unique(na.omit(protein_coding_genes$gene_name))
+# Compare initial protein coding genes' number with filtered ones 
+nrow(protein_coding_genes) #initial protein_coding_genes number
+length(protein_coding_names) #protein_coding_genes number after filter
+
+
+# Filter Seurat Object by using protein coding genes' gene_names
+valid_names <- intersect(rownames(seurat_obj), protein_coding_names)
+seurat_obj <- subset(seurat_obj, features = valid_names)
+
+# Final check of the new Object
+seurat_obj
+```
+
+---
+
+# Task 2 - GENE EXPRESSION SUMMARY
+
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
+# Extract raw count matrix from the RNA assay of the Seurat object
+counts_matrix <- GetAssayData(seurat_obj, slot = "counts")
+dim(counts_matrix)
+summary(counts_matrix[1:10,1:10]) #statistical summary
+
+# Create logical matrix "genes_over_3" that defines TRUE for genes in a cell with UMI >= 3, FALSE otherwise
+genes_over_3 <- counts_matrix >= 3 #Creates a logical matrix (TRUE/FALSE)
+
+# For each column, sum TRUE values to define how many genes with UMI>=3 per cell
+genes_3plus_per_cell <- colSums(genes_over_3)
+summary(genes_3plus_per_cell)  #summary stats
+
+# Add a new column to Seurat object metadata called "Gene3plus" for each cell
+seurat_obj$Genes3plus <- genes_3plus_per_cell
+head(seurat_obj@meta.data$Genes3plus)
+
+# Violin plot showing distribution of number of genes with ≥3 UMI per cell
+VlnPlot(seurat_obj, features = "Genes3plus", pt.size = 0) +
+  theme(axis.title = element_blank(), axis.text = element_blank(), axis.ticks = element_blank(),axis.text.x = element_blank()) + labs(fill = "Genes ≥ 3 UMI")
+```
+
+---
+
+# Task 3 - GENE FILTERING
+
+```{r, message=FALSE, warning=FALSE}
+# Find mitochondrial genes in Seurat Object (start with MT-)
+mt_genes <- grep("^MT-", rownames(seurat_obj), value = TRUE)
+# Find ribosomal proteins in Seurat Object (start with RPL or RPS)
+ribo_proteins <- grep("^(RPL|RPS)", rownames(seurat_obj), value = TRUE)
+
+# Mitochondrial pseudogenes should have already been filtered at task 1, when filtering for "genes", that automatically excludes pseudogenes
+
+
+# Unite the filtered ribosomal proteins and mitochondrial genes into th genes_to_remove list
+genes_to_remove <- union(mt_genes, ribo_proteins)
+
+# Create a summary table of filtered genes by category
+data.frame(
+  Category = c("Mitochondrial_genes", "Ribosomal_proteins"),
+  Genes_removed = c(length(mt_genes), length(ribo_proteins))
+)
+
+# Create a list "genes_to_keep" that contains genes from the SeuratObject except the ones to remove
+genes_to_keep <- setdiff(rownames(seurat_obj), genes_to_remove)
+# Maintain in SeuratObject only the previously filtered list
+seurat_obj <- subset(seurat_obj, features = genes_to_keep)
+```
+
+---
+
+# Task 4 - Principal Component Analysis (PCA)
+
+```{r, message=FALSE, warning=FALSE}
+# Normalize data
+seurat_obj <- NormalizeData(seurat_obj)
+# Identify highly variable genes
+seurat_obj <- FindVariableFeatures(seurat_obj)
+# Scale data
+seurat_obj <- ScaleData(seurat_obj)
+# Perform PCA
+seurat_obj <- RunPCA(seurat_obj)
+# Elbow plot to visualize variance explained by the first 20 principal components
+ElbowPlot(seurat_obj, ndims = 20)
+```
+
+---
+
+# Task 5 - UMAP Visualization
+
+Based on the Elbow Plot, I selected the first 18 principal components (PCs), which show distinct standard deviations and correspond to the inflection point before the plot flattens (linearizes), suggesting they carry meaningful variance
+
+```{r, message=FALSE, warning=FALSE}
+# Find similar neighbors for each cell using first 18 PCs
+seurat_obj <- FindNeighbors(seurat_obj, dims = 1:18)
+# Run UMAP and visualize
+seurat_obj <- RunUMAP(seurat_obj, dims = 1:18)
+DimPlot(seurat_obj, reduction = "umap") + theme(axis.title = element_blank(), axis.text = element_blank(), axis.ticks = element_blank()) + ggtitle("Unclustered UMAP")
+```
+
+---
+
+# Task 6 - CLUSTERING
+
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
+# Find cell clusters with FindClusters function - resolution at 0.5 is a standard value setting
+seurat_obj <- FindClusters(seurat_obj, resolution = 0.5)
+
+# UMAP colored by cluster identity (graph-based clustering)
+DimPlot(seurat_obj, reduction = "umap", label = TRUE) + theme(axis.title = element_blank(), axis.text = element_blank(), axis.ticks = element_blank()) + ggtitle("UMAP of clusters") 
+  
+```
+
+---
+
+# Task 7 - CELL TYPE ANNOTATION
+
+```{r, message=FALSE, warning=FALSE}
+# Install required packages for annotation (if not already installed)
+if (!require("SingleR")) BiocManager::install("SingleR")
+if (!require("celldex")) BiocManager::install("celldex")
+if (!require("scRNAseq")) BiocManager::install("scRNAseq")
+
+library(SingleR)
+library(celldex)
+library(scRNAseq)
+
+# Use Human Primary Cell Atlas Data to identify cell types
+ref <- celldex::HumanPrimaryCellAtlasData()
+
+# Extract previously log-normalized expression data from my Seurat Object's data
+norm_counts <- GetAssayData(seurat_obj, slot = "data")
+
+# Find genes that are shared between test data and reference
+common_genes <- intersect(rownames(norm_counts), rownames(ref))
+# Subset both the test and reference matrices to contain only the common genes - this step is required because SingleR needs both matrices to have exactly the same genes
+norm_counts <- norm_counts[common_genes, ]
+ref <- ref[common_genes, ]
+
+# Run SingleR to automatically annotate each cell by comparing its expression profile to reference cell types from the Human Primary Cell Atlas
+# test = matrix of normalized expression (my cells)
+# ref = reference matrix with annotated cell types
+# labels = column in the reference containing cell type labels
+pred <- SingleR(test = as.matrix(norm_counts), ref = ref, labels = ref$label.fine)
+
+# Store SingleR predicted labels in the Seurat object metadata by creating a new column called "SingleR_labels" where each cell is assigned a cell type
+seurat_obj$SingleR_labels <- pred$labels
+```
+
+
+```{r fig.height=6, fig.width=12, message=FALSE, warning=FALSE}
+#UMAP Visualization of SingleR-predicted cell types
+# This shows how each cell has been annotated based on transcriptomic similarity to reference profiles
+DimPlot(seurat_obj, group.by = "SingleR_labels", label = FALSE) + theme(axis.title = element_blank(), axis.text = element_blank(), axis.ticks = element_blank(), legend.text = element_text(size = 8)
+)
+```
+
+---
+
+# Task 8 - Tissue Origin Inference
+Based on the predicted cell types obtained with SingleR, the dataset displays a highly diverse and structured population of immune-related cells. The population consists both of lymphoid and myeloid lineages, including CD4+ and CD8+ T lymphocytes (with naïve, effector memory, central memory, and gamma-delta subsets), B cells (immature, memory, and plasma cells), natural killer (NK) cells, monocytes (CD14+ and CD16+), macrophage subsets, and neutrophils. Notably, early hematopoietic progenitors such as common myeloid progenitors (CMP), granulocyte-monocyte progenitors (GMP), megakaryocyte-erythroid progenitors (MEP), and hematopoietic stem cells (HSCs), as well as platelets, which derive from megakaryocytic differentiation, are present too. The co-existence of such a wide range of differentiation stages—from primitive stem/progenitor cells to fully differentiated immune effector cells, strongly suggests a full hematopoietic landscape, encompassing both lymphatic and myeloid differentiation pathways. The cell composition suggests that the sample may originate from a hematopoietic tissue (e.g., bone marrow or enriched peripheral blood), but the marked expansion of effector/memory T cells, plasma cells, monocyte subsets, and neutrophils is strongly indicative of a recent immune activation, possibly in the context of ongoing infection or inflammatory disease.

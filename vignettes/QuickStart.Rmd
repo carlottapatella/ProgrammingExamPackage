@@ -1,0 +1,84 @@
+---
+title: "QuickStart: Using ProgrammingExamPackage"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{QuickStart: Using ProgrammingExamPackage}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, eval = FALSE)
+library(ProgrammingExamPackage)
+library(Seurat)
+```
+
+
+```{r task1a}
+# Extract Gene Annotations from GTF
+gene_info <- extract_gene_annotations_from_gtf("Homo_sapiens.GRCh38.111.gtf")
+head(gene_info)
+```
+
+
+```{r task1b}
+# Filter Seurat object by gene list
+seurat <- filter_seurat_by_genes(seurat, gene_ids = gene_info$gene_id)
+```
+
+
+```{r task1c}
+# Keep only protein-coding genes
+seurat <- filter_protein_coding_genes(seurat, "Homo_sapiens.GRCh38.111.gtf")
+```
+
+
+```{r task2}
+# Gene Expression Summary (≥3 UMIs per cell)
+res_expr <- plot_gene_expression_summary(seurat)
+res_expr$plot
+```
+
+
+```{r task3}
+# Filter unwanted gene categories
+res_filter <- filter_unwanted_gene_categories(seurat)
+res_filter$summary_table
+seurat <- res_filter$filtered_seurat
+```
+
+
+```{r task4}
+# PCA and explained variance 
+res_pca <- run_pca_and_plot(seurat)
+```
+
+
+```{r task5}
+# Unclustered UMAP visualization
+res_umap <- run_umap_custom(res_pca$seurat, dims = 1:10)
+res_umap$plot
+```
+
+
+```{r task6}
+# Clustering
+res_cluster <- run_clustering(res_umap$seurat, dims = 1:10)
+res_cluster$plot
+```
+
+```{r task7}
+# Cell Type Annotation (SingleR)
+pred <- annotate_cell_types(seurat, ref = ref_matrix, labels = ref_labels)
+pred$plot
+
+```
+
+```{r task8}
+# Tissue Origin Inference
+# Requires marker list (e.g. from derive_marker_list_from_reference()).
+result <- assign_tissue_to_clusters(seurat, marker_list)
+print(result)
+```
+
