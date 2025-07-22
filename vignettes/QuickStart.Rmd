@@ -10,8 +10,14 @@ vignette: >
 ```{r setup, include=FALSE}
 
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, eval = FALSE)
-library(ProgrammingExamPackage)
 library(Seurat)
+library(SeuratObject)
+library(ggplot2)
+library(here)
+library(SingleR)
+library(celldex)
+library(scRNAseq)
+
 ```
 
 
