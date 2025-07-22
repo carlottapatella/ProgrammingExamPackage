@@ -17,12 +17,15 @@ This analysis is based on a dataset of approximately 10,000 cells obtained with 
 # Task 0 - Setup
 
 ```{r, message=FALSE, warning=FALSE}
-# Install Seurat and SeuratObject (if not already present) and load libraries
-if (!require("Seurat")) BiocManager::install("SingleR")
-if (!require("SeuratObject")) BiocManager::install("celldex")
-
+# Import libraries (the installations are managed by the Dockerfile)
 library(Seurat)
 library(SeuratObject)
+library(ggplot2)
+library(here)
+library(SingleR)
+library(celldex)
+library(scRNAseq)
+
 ```
 
 ---
@@ -31,16 +34,14 @@ library(SeuratObject)
 
 ```{r, message=FALSE, warning=FALSE}
 
-# Set the working directory where the GTF file is located
-library(here)
-
 # Load the GTF file
-gtf <- read.table(here::here("Homo_sapiens.GRCh38.111.gtf"), sep = "\t", header = FALSE, comment.char = "#")
+gtf <- read.table(here("Homo_sapiens.GRCh38.111.gtf"), sep = "\t", header = FALSE, comment.char = "#")
 head(gtf)  # check the first lines of the file
 
 
 # Load 10X expression data from the "filtered_feature_bc_matrix" folder (contains barcodes, features, and count matrix)
-data <- Read10X(data.dir = "filtered_feature_bc_matrix")
+data <- Read10X(data.dir = here("filtered_feature_bc_matrix"))
+
 
 # Create Seurat object 
 seurat_obj <- CreateSeuratObject(counts = data)
@@ -62,6 +63,7 @@ extract_attribute <- function(text, key) {
 
 # From column V3 of the GTF file that contains the each gene's annotations, select only rows that are classified as "gene"
 only_genes <- gtf[gtf$V3 == "gene", ]
+# è un data frame
 
 #Assess the filtration's happening by comparing initial number of data and filtered genes
 nrow(gtf) #initial data
@@ -76,14 +78,16 @@ only_genes$gene_biotype <- sapply(only_genes$V9, extract_attribute, key = "gene_
 protein_coding_genes <- only_genes[only_genes$gene_biotype == "protein_coding", ]
 # Remove not-named genes to avoid mismatches that cause errors
 protein_coding_names <- unique(na.omit(protein_coding_genes$gene_name))
+#unique(...)Rimuove i duplicati: ogni nome di gene compare una sola volta.
+
 # Compare initial protein coding genes' number with filtered ones 
 nrow(protein_coding_genes) #initial protein_coding_genes number
 length(protein_coding_names) #protein_coding_genes number after filter
 
 
 # Filter Seurat Object by using protein coding genes' gene_names
-valid_names <- intersect(rownames(seurat_obj), protein_coding_names)
-seurat_obj <- subset(seurat_obj, features = valid_names)
+valid_names <- intersect(rownames(seurat_obj), protein_coding_names) #tiene solo i nomi che sono sia nel Seurat object sia nella lista di geni codificanti per proteine.
+seurat_obj <- subset(seurat_obj, features = valid_names) #Aggiorni l’oggetto Seurat tenendo solo i geni valid_names.
 
 # Final check of the new Object
 seurat_obj
@@ -96,7 +100,7 @@ seurat_obj
 ```{r, message=FALSE, warning=FALSE}
 library(ggplot2)
 # Extract raw count matrix from the RNA assay of the Seurat object
-counts_matrix <- GetAssayData(seurat_obj, slot = "counts")
+counts_matrix <- GetAssayData(seurat_obj, slot = "counts") #GetAssayData() funzione di seurat che estrae dati  di uno specifico slot dell'oggetto seurat
 dim(counts_matrix)
 summary(counts_matrix[1:10,1:10]) #statistical summary
 
@@ -140,7 +144,7 @@ data.frame(
 
 # Create a list "genes_to_keep" that contains genes from the SeuratObject except the ones to remove
 genes_to_keep <- setdiff(rownames(seurat_obj), genes_to_remove)
-# Maintain in SeuratObject only the previously filtered list
+# Mantain in SeuratObject only the previously filtered list
 seurat_obj <- subset(seurat_obj, features = genes_to_keep)
 ```
 
@@ -169,7 +173,7 @@ Based on the Elbow Plot, I selected the first 18 principal components (PCs), whi
 
 ```{r, message=FALSE, warning=FALSE}
 # Find similar neighbors for each cell using first 18 PCs
-seurat_obj <- FindNeighbors(seurat_obj, dims = 1:18)
+seurat_obj <- FindNeighbors(seurat_obj, dims = 1:18) 
 # Run UMAP and visualize
 seurat_obj <- RunUMAP(seurat_obj, dims = 1:18)
 DimPlot(seurat_obj, reduction = "umap") + theme(axis.title = element_blank(), axis.text = element_blank(), axis.ticks = element_blank()) + ggtitle("Unclustered UMAP")
@@ -194,14 +198,6 @@ DimPlot(seurat_obj, reduction = "umap", label = TRUE) + theme(axis.title = eleme
 # Task 7 - CELL TYPE ANNOTATION
 
 ```{r, message=FALSE, warning=FALSE}
-# Install required packages for annotation (if not already installed)
-if (!require("SingleR")) BiocManager::install("SingleR")
-if (!require("celldex")) BiocManager::install("celldex")
-if (!require("scRNAseq")) BiocManager::install("scRNAseq")
-
-library(SingleR)
-library(celldex)
-library(scRNAseq)
 
 # Use Human Primary Cell Atlas Data to identify cell types
 ref <- celldex::HumanPrimaryCellAtlasData()
