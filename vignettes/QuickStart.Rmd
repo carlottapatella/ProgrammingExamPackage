@@ -5,6 +5,9 @@ vignette: >
   %\VignetteIndexEntry{QuickStart: Using ProgrammingExamPackage}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+
+description: This vignette demonstrates how to use the `ProgrammingExamPackage` to perform a basic single-cell RNA-seq analysis using Seurat. It walks through the key steps including gene annotation, filtering, dimensionality reduction, clustering, cell type annotation, and tissue inference.
+
 ---
 
 ```{r setup, include=FALSE}
