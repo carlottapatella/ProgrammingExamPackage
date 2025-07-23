@@ -2,3 +2,5 @@
 inst/doc
 /doc/
 /Meta/
+Homo_sapiens.GRCh38.111.gtf
+filtered_feature_bc_matrix/matrix.mtx.gz
