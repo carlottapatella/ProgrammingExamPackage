@@ -2,6 +2,7 @@
 
 This repository contains the full analysis pipeline for a single-cell RNA sequencing dataset (~10,000 cells, 10X Genomics 3’ technology) as part of the July exam project.
 
+
 ## Contents
 
 - `exam_analysis.Rmd` – RMarkdown report with complete analysis and code  
@@ -63,3 +64,21 @@ If you prefer a containerized environment, you can run the entire analysis via D
 docker run -v $(pwd):/app carlottapat/singlecell-project
 
 
+---
+
+## Required R Packages
+
+Before running the analysis locally, make sure you have the following R packages installed:
+
+### 🔹 CRAN Packages
+```r
+install.packages(c(
+  "ggplot2", "dplyr", "Matrix", "patchwork", "readr",
+  "uwot", "Rtsne", "tibble", "stringr", "scales",
+  "viridisLite", "rmarkdown", "knitr"
+))
+
+BiocManager::install(c(
+  "Seurat", "SingleR", "celldex", "SummarizedExperiment",
+  "rtracklayer", "org.Hs.eg.db", "AnnotationDbi", "scRNAseq"
+))
