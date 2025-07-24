@@ -70,7 +70,7 @@ docker run -v $(pwd):/app carlottapat/singlecell-project
 
 Before running the analysis locally, make sure you have the following R packages installed:
 
-### 🔹 CRAN Packages
+### CRAN Packages
 ```r
 install.packages(c(
   "ggplot2", "dplyr", "Matrix", "patchwork", "readr",
@@ -78,6 +78,7 @@ install.packages(c(
   "viridisLite", "rmarkdown", "knitr"
 ))
 
+### BIOMANAGER Packages
 BiocManager::install(c(
   "Seurat", "SingleR", "celldex", "SummarizedExperiment",
   "rtracklayer", "org.Hs.eg.db", "AnnotationDbi", "scRNAseq"
