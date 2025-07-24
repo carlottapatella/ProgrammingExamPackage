@@ -50,7 +50,7 @@ This repository contains the full analysis pipeline for a single-cell RNA sequen
    - Proposed tissue of origin  
    - Justified with marker genes and cluster identity
 
-## 💻 How to Run Locally
+## How to Run Locally
 
 1. Open `exam_analysis.Rmd` in RStudio  
 2. Ensure required packages are installed (see report header)  
