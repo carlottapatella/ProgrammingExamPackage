@@ -56,7 +56,7 @@ This repository contains the full analysis pipeline for a single-cell RNA sequen
 2. Ensure required packages are installed (see report header)  
 3. Click **"Knit"** to generate the HTML or PDF report  
 
-## 🐳 Run with Docker
+## Run with Docker
 
 If you prefer a containerized environment, you can run the entire analysis via Docker.
 
