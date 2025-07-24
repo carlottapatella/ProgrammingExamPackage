@@ -2,7 +2,7 @@
 
 This repository contains the full analysis pipeline for a single-cell RNA sequencing dataset (~10,000 cells, 10X Genomics 3’ technology) as part of the July exam project.
 
-## 📁 Contents
+## Contents
 
 - `exam_analysis.Rmd` – RMarkdown report with complete analysis and code  
 - `functions.R` – Optional modular functions (if applicable)  
